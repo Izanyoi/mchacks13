@@ -16,6 +16,7 @@ interface CalendarHeaderProps {
   onShare: () => void;
   monthYearDisplay: string;
   events: Event[];
+  isSharedMode?: boolean;
 }
 
 export default function CalendarHeader({
@@ -26,6 +27,7 @@ export default function CalendarHeader({
   onShare,
   monthYearDisplay,
   events,
+  isSharedMode,
 }: CalendarHeaderProps) {
   return (
     <div className="border-b border-gray-200 px-6 py-3">
@@ -75,7 +77,7 @@ export default function CalendarHeader({
             onClick={onOpenCreateModal}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700"
           >
-            Create
+            {isSharedMode ? "Create Joint Task" : "Create"}
           </button>
         </div>
       </div>

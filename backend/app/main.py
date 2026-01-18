@@ -180,8 +180,8 @@ class Schedule:
             newBlock = BlockDB(
                 user_id=self.user_id,
                 task_id=task_db_id,
-                start=task.start,
-                end=task.end
+                start=task.start-datetime.timedelta(hours=5),
+                end=task.end-datetime.timedelta(hours=5)
             )
             self.session.add(newBlock)
             self.session.commit()
@@ -586,7 +586,7 @@ def addTwinBlocks(
         name=task_in.name,
         priority=task_in.priority,
         due_date=task_in.dueDate,
-        estimated_minutes=task_in.estimatedTime,
+        estimatedTime=task_in.estimatedTime,
         with_friend=True,
         instances=task_in.instances or 1
     )
@@ -645,7 +645,9 @@ def addTwinBlocks(
                 difference = abs(value1-value2)
     
     for j in range(24 - task_in.estimatedTime.seconds // 3600):
-            if my_schedule.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task_in.estimatedTime.seconds // 3600, 0), minDate) and friend_schedule.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task_in.estimatedTime.seconds // 3600, 0), minDate):
+            start_dt = datetime.datetime.combine(minDate, datetime.time(j, 0))
+            end_dt = datetime.datetime.combine(minDate, datetime.time(j + task_in.estimatedTime.seconds // 3600, 0))
+            if my_schedule.is_free(minDate.weekday(), start_dt, end_dt) and friend_schedule.is_free(minDate.weekday(), start_dt, end_dt):
                 #need to change for edgecase of midnight for end date
                 start_dt = datetime.datetime(minDate.year, minDate.month, minDate.day, j)
                 end_dt = datetime.datetime(minDate.year, minDate.month, minDate.day, j + task_in.estimatedTime.seconds//3600)

@@ -127,5 +127,10 @@ export const share = {
       }
     });
     return response.data;
+  },
+  addTwinBlocks: async (token: string, task: TaskInput) => {
+    await auth.ensureLoggedIn();
+    const response = await api.post(`/share/view/${token}`, task);
+    return response.data;
   }
 };

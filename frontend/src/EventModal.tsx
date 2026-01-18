@@ -7,6 +7,7 @@ interface Event {
   duration: number;
   color: string;
   priority: number;
+  autoSchedule?: boolean;
 }
 
 interface EventModalProps {
@@ -35,6 +36,7 @@ export default function EventModal({
   const [currentEvent, setCurrentEvent] = useState(event);
 
   useEffect(() => {
+    event.priority = 3;
     setCurrentEvent(event);
   }, [event]);
 
@@ -74,7 +76,7 @@ export default function EventModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Day
+              Due Date
             </label>
             <select
               value={currentEvent.date.getDay()}
@@ -99,17 +101,36 @@ export default function EventModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Time
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                Start Time
+              </label>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="autoSchedule"
+                  checked={currentEvent.autoSchedule || false}
+                  onChange={(e) =>
+                    setCurrentEvent({ ...currentEvent, autoSchedule: e.target.checked })
+                  }
+                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="autoSchedule" className="text-sm text-gray-600">
+                  Auto Schedule
+                </label>
+              </div>
+            </div>
             <select
+              disabled={currentEvent.autoSchedule}
               value={currentEvent.date.getHours()}
+
               onChange={(e) => {
                 const newDate = new Date(currentEvent.date);
                 newDate.setHours(parseInt(e.target.value));
                 setCurrentEvent({ ...currentEvent, date: newDate });
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${currentEvent.autoSchedule ? "bg-gray-100 text-gray-500 cursor-not-allowed" : ""
+                }`}
             >
               {hours.map((hour) => (
                 <option key={hour} value={hour}>

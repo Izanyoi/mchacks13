@@ -12,6 +12,7 @@ interface Event {
   duration: number;
   color: string;
   priority: number;
+  autoSchedule?: boolean;
 }
 
 export const PRIORITY_COLORS: Record<number, string> = {
@@ -27,9 +28,10 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   const [isSharedMode, setIsSharedMode] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const [sharedUsername, setSharedUsername] = useState("");
 
-  const [newEvent, setNewEvent] = useState<{ title: string, date: Date, duration: number, color: string, priority: number }>({
+  const [newEvent, setNewEvent] = useState<Omit<Event, "id">>({
     title: "",
     date: new Date(),
     duration: 1,
@@ -106,6 +108,7 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
       const data = await share.view(token, start, end);
       setSharedUsername(data.username);
       setIsSharedMode(true);
+      setShareToken(token);
 
       const mappedEvents = data.schedule.map((slot, index) => {
         const startDate = new Date(slot.start);
@@ -176,22 +179,33 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
     const start = eventData.date;
     const end = new Date(start.getTime() + eventData.duration * 60 * 60 * 1000);
 
+    const taskInput = {
+      name: eventData.title,
+      priority: eventData.priority,
+      dueDate: end.toISOString(),
+      estimatedTime: eventData.duration * 3600, // Convert hours to seconds
+      withFriend: false,
+      start: eventData.autoSchedule ? undefined : start.toISOString(),
+      end: eventData.autoSchedule ? undefined : end.toISOString(),
+      instances: 1
+    };
+
     try {
-      await tasks.add({
-        name: eventData.title,
-        priority: eventData.priority,
-        dueDate: end.toISOString(),
-        estimatedTime: eventData.duration * 3600, // Convert hours to seconds
-        withFriend: false,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        instances: 1
-      });
-      await fetchEvents();
+      if (isSharedMode && shareToken) {
+        await share.addTwinBlocks(shareToken, taskInput);
+        await fetchSharedEvents(shareToken);
+      } else {
+        await tasks.add(taskInput);
+        await fetchEvents();
+      }
       setShowModal(false);
     } catch (e) {
       console.error("Failed to add task", e);
-      alert("Failed to create event");
+      if (isSharedMode) {
+        alert("Failed to create joint task. Check if you are logged in.");
+      } else {
+        alert("Failed to create event");
+      }
     }
   };
 
@@ -249,6 +263,7 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
         onShare={handleShare}
         monthYearDisplay={isSharedMode ? `Viewing ${sharedUsername}'s Calendar` : getMonthYearDisplay()}
         events={events}
+        isSharedMode={isSharedMode}
       />
 
       <WeekView
