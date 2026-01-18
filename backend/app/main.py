@@ -52,7 +52,7 @@ class TaskDB(SQLModel, table=True):
     name: str
     priority: int
     due_date: datetime.datetime
-    estimated_minutes: int
+    estimatedTime: datetime.timedelta
     with_friend: bool
     instances: int = 1
 
@@ -111,6 +111,8 @@ class Schedule:
                         [NoZone(datetime.time(0, 0), datetime.time(self.WORK_START, 0)), NoZone(datetime.time(self.WORK_END, 0), datetime.time(23, 59))],
                         [NoZone(datetime.time(0, 0), datetime.time(self.WORK_START, 0)), NoZone(datetime.time(self.WORK_END, 0), datetime.time(23, 59))]]
     
+    def copySchedule(self, schedule):
+        self.schedule = schedule.getSchedule()
     
     def getSchedule(self):
         return self.schedule
@@ -141,6 +143,36 @@ class Schedule:
                     return False
 
         return True
+    
+    def totalTime(self, day: datetime.date):
+        total = 0 
+        for noZone in self.noZones[day.weekday()]:
+            total += noZone.end.hour + ceil(noZone.end.minute/60) - noZone.start.hour
+        return 24 - total
+    
+    def getValue(self, check_date: datetime.date, optimal_date: datetime.date, index: int):
+        value = self.howBusy(check_date)
+        if index <= 5:
+            value += (0.2 * index + 1) * value
+        else:
+            value *= 2
+        return value
+    
+    def findMinDate(self, task):
+        fraction: float = (task.priority - 1)/4
+        current: datetime.date = datetime.date.today() + (task.dueDate.date() - datetime.date.today()) * fraction
+            
+        n = (task.dueDate.date() - datetime.date.today()).days
+
+        minDate = datetime.date(3000,12,31)
+        minValue = float("inf")
+        for i in range(n+1):
+            day = datetime.date.today() + i*datetime.timedelta(days=1)
+            value = self.getValue(day, current, i)
+            if value <= minValue and abs(day-current) < abs(minDate-current):
+                minValue = value
+                minDate = day
+        return minValue, minDate
 
     def addBlock(self, task: Task, task_db_id: int):
         #adding manually
@@ -158,31 +190,14 @@ class Schedule:
             return True
 
         #Automatic Algorithm
-        half: datetime.timedelta = (task.dueDate.date() - datetime.date.today())/2
-        current: datetime.date = datetime.date.today() + half
-
-        minDate = current
-        minValue = self.howBusy(current)
-
-        for i in range(1,16):
-            value = self.howBusy(current + i*datetime.timedelta(days=1))
-            if i <= 5:
-                value += (0.2*i + 1)*value
-            else:
-                value *= 2
-            if value < minValue:
-                minValue = value
-                minDate = current + i*datetime.timedelta(days=1)
-
-        for i in range(1,16):
-            value = self.howBusy(current - i*datetime.timedelta(days=1))
-            if i <= 5:
-                value += (0.2*i + 1)*value
-            else:
-                value *= 2
-            if value < minValue:
-                minValue = value
-                minDate = current - i*datetime.timedelta(days=1)
+        else:
+            if (task.estimatedTime.seconds//3600) >= 5:
+                new_task = Task(task.name, task.priority, task.dueDate, datetime.timedelta(hours=3), 
+                                task.withFriend, task.MAX_BLOCK_DURATION)
+                task.changeEstimatedTime(task.estimatedTime - datetime.timedelta(hours=3))
+                self.addBlock(new_task)
+            
+            minValue, minDate = self.findMinDate(task)
 
         duration = task.estimatedTime.seconds // 3600
 
@@ -325,7 +340,7 @@ class TaskInput(BaseModel):
     name: str
     priority: int
     dueDate: datetime.datetime
-    estimatedTimeMinutes: int
+    estimatedTime: datetime.timedelta
     withFriend: bool
     start: datetime.datetime | None = None
     end: datetime.datetime | None = None
@@ -368,7 +383,7 @@ def add_task(
         name=task_in.name,
         priority=task_in.priority,
         due_date=task_in.dueDate,
-        estimated_minutes=task_in.estimatedTimeMinutes,
+        estimatedTime=task_in.estimatedTime,
         with_friend=task_in.withFriend,
         instances=task_in.instances or 1
     )
@@ -380,10 +395,10 @@ def add_task(
         name=task_in.name,
         priority=task_in.priority,
         dueDate=task_in.dueDate,
-        estimatedTime=datetime.timedelta(minutes=task_in.estimatedTimeMinutes),
+        estimatedTime=task_in.estimatedTime,
         withFriend=task_in.withFriend
     )
-    
+
     task_logic.advancedOptions(
         start=task_in.start,
         end=task_in.end,

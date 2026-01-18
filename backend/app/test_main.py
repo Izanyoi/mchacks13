@@ -1,3 +1,4 @@
+import datetime
 from fastapi.testclient import TestClient
 from app.main import app, create_db_and_tables
 
@@ -38,7 +39,7 @@ def test_add_task_auto():
             "name": "Study Math",
             "priority": 3,
             "dueDate": "2026-02-01T23:59:00",
-            "estimatedTimeMinutes": 120,
+            "estimatedTime": 120,
             "withFriend": False
         }
     )
@@ -58,7 +59,7 @@ def test_add_task_manual():
             "name": "Gym",
             "priority": 1,
             "dueDate": "2026-02-01T23:59:00",
-            "estimatedTimeMinutes": 60,
+            "estimatedTime": 60,
             "withFriend": False,
             "start": "2026-01-20T18:00:00",
             "end": "2026-01-20T19:00:00"
@@ -107,7 +108,7 @@ def test_update_block():
             "name": "To be updated",
             "priority": 1,
             "dueDate": "2026-02-01T23:59:00",
-            "estimatedTimeMinutes": 60,
+            "estimatedTime": 60,
             "withFriend": False,
             "start": "2026-01-25T10:00:00",
             "end": "2026-01-25T11:00:00"
@@ -143,7 +144,7 @@ def test_share_calendar_flow():
             "name": "Secret Meeting",
             "priority": 1,
             "dueDate": "2026-02-01T23:59:00",
-            "estimatedTimeMinutes": 60,
+            "estimatedTime": 60,
             "withFriend": False,
             "start": "2026-01-25T15:00:00",
             "end": "2026-01-25T16:00:00"
