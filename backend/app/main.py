@@ -555,3 +555,118 @@ def view_shared_calendar(
         "username": user.username,
         "schedule": public_schedule
     }
+
+@app.post("/share/view/{token}")
+def addTwinBlocks(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    token: str,
+    date_start: datetime.date, 
+    date_end: datetime.date,
+    session: SessionDep,
+    task_in: TaskInput,
+    start = None, end = None
+):
+    link = session.exec(select(ShareLink).where(ShareLink.token == token)).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Invalid link")
+
+    if datetime.datetime.now() > (link.created_at + datetime.timedelta(days=2)):
+        session.delete(link)
+        session.commit()
+        raise HTTPException(status_code=410, detail="This link has expired.")
+
+    friend = session.get(User, link.user_id)
+    if not friend:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if friend.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot share a task with yourself.")
+    
+    #Me
+    task_db_me = TaskDB(
+        user_id=current_user.id,
+        name=task_in.name,
+        priority=task_in.priority,
+        due_date=task_in.dueDate,
+        estimated_minutes=task_in.estimatedTime,
+        with_friend=True,
+        instances=task_in.instances or 1
+    )
+    session.add(task_db_me)
+
+    #Friend
+    task_db_friend = TaskDB(
+        user_id=friend.id,
+        name=f"{task_in.name} (Shared)",
+        priority=task_in.priority,
+        due_date=task_in.dueDate,
+        estimatedTime=task_in.estimatedTime,
+        with_friend=True,
+        instances=task_in.instances or 1
+    )
+    session.add(task_db_friend)
+    session.commit()
+    session.refresh(task_db_me)
+    session.refresh(task_db_friend)
+
+    my_schedule = Schedule(session=session, user_id=current_user.id)
+    friend_schedule = Schedule(session=session, user_id=friend.id)
+
+    if task_in.start != None and task_in.end != None:
+        block_me = BlockDB(user_id=current_user.id, task_id=task_db_me.id, start=task_in.start, end=task_in.end)
+        block_friend = BlockDB(user_id=friend.id, task_id=task_db_friend.id, start=task_in.start, end=task_in.end)
+        session.add(block_me)
+        session.add(block_friend)
+        session.commit()
+        return {"status": "Scheduled manually"}
+
+    fraction: float = (task_in.priority - 1) / 4
+    current: datetime.date = datetime.date.today() + (task_in.dueDate.date() - datetime.date.today()) * fraction
+        
+    n = (task_in.dueDate.date() - datetime.date.today()).days
+
+    minDate = datetime.date(3000,12,31)
+    minValue = float("inf")
+    difference = float("inf")
+    for i in range(n+1):
+        day = datetime.date.today() + i*datetime.timedelta(days=1)
+        value1 = my_schedule.getValue(day, current, i)
+        value2 = friend_schedule.getValue(day, current, i)
+        if value1 + value2 < minValue:
+            minDate= day
+            minValue = value1 + value2
+            difference = abs(value1-value2)
+        elif value1 + value2 == minValue:
+            if abs(value1-value2) < difference:
+                minDate= day
+                minValue = value1 + value2
+                difference = abs(value1-value2)
+            elif  abs(value1-value2) == difference and abs(day-current) < abs(minDate-current):
+                minDate= day
+                minValue = value1 + value2
+                difference = abs(value1-value2)
+    
+    for j in range(24 - task_in.estimatedTime.seconds // 3600):
+            if my_schedule.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task_in.estimatedTime.seconds // 3600, 0), minDate) and friend_schedule.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task_in.estimatedTime.seconds // 3600, 0), minDate):
+                #need to change for edgecase of midnight for end date
+                start_dt = datetime.datetime(minDate.year, minDate.month, minDate.day, j)
+                end_dt = datetime.datetime(minDate.year, minDate.month, minDate.day, j + task_in.estimatedTime.seconds//3600)
+
+                block_me = BlockDB(
+                    user_id=current_user.id, 
+                    task_id=task_db_me.id, 
+                    start=start_dt, 
+                    end=end_dt
+                )
+                block_friend = BlockDB(
+                    user_id=friend.id, 
+                    task_id=task_db_friend.id, 
+                    start=start_dt, 
+                    end=end_dt
+                )
+
+                session.add(block_me)
+                session.add(block_friend)
+                session.commit()
+
+                return {"status": "Scheduled automatically", "start": start_dt, "end": end_dt}
