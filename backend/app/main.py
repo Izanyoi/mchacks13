@@ -9,6 +9,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select, or_
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pydantic import BaseModel, EmailStr
+import secrets
 
 SECRET_KEY = "2e10a6460d9445a93593598e8b5c20fca5a5e28207060dc97ab5ffb8d333db9a"
 ALGORITHM = "HS256"
@@ -83,6 +84,15 @@ class Task:
         self.minTime = None
         self.maxTime = None
         self.MAX_BLOCK_DURATION = MAX_BLOCK_DURATION
+    
+    def advancedOptions(self, start: datetime.datetime, end: datetime.datetime, minTime: datetime.time, maxTime: datetime.time, instances: int = 1):
+        self.start = start
+        self.end = end
+        if instances:
+            self.instances = instances
+        self.instances = instances
+        self.minTime = minTime
+        self.maxTime = maxTime
 
 class Schedule:
     def __init__(self, session: Session, user_id: int, WORK_START: int = 9, WORK_END: int = 21):
@@ -320,8 +330,8 @@ class TaskInput(BaseModel):
     start: datetime.datetime | None = None
     end: datetime.datetime | None = None
     instances: int | None = 1
-    minTime: str | None = None 
-    maxTime: str | None = None
+    minTime: datetime.time | None = None 
+    maxTime: datetime.time | None = None
 
 @app.patch("/users/me/name", response_model=UserPublic)
 async def update_user_name(
@@ -373,8 +383,14 @@ def add_task(
         estimatedTime=datetime.timedelta(minutes=task_in.estimatedTimeMinutes),
         withFriend=task_in.withFriend
     )
-    if task_in.start: task_logic.start = task_in.start
-    if task_in.end: task_logic.end = task_in.end
+    
+    task_logic.advancedOptions(
+        start=task_in.start,
+        end=task_in.end,
+        instances=task_in.instances,
+        minTime=task_in.minTime,
+        maxTime=task_in.maxTime
+    )
 
     schedule_engine = Schedule(session=session, user_id=current_user.id)
 
@@ -422,3 +438,105 @@ def get_schedule(
         })
 
     return output
+
+class BlockUpdate(BaseModel):
+    start: datetime.datetime | None = None
+    end: datetime.datetime | None = None
+
+@app.patch("/tasks/block/{block_id}")
+async def update_block(
+    block_id: int, 
+    block_update: BlockUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)], 
+    session: SessionDep
+):
+    statement = select(BlockDB).where(
+        BlockDB.user_id == current_user.id,
+        BlockDB.id == block_id
+    )
+    block = session.exec(statement).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+    
+    if block_update.start:
+        block.start = block_update.start
+    if block_update.end:
+        block.end = block_update.end
+        
+    session.add(block)
+    session.commit()
+    session.refresh(block)
+    return block
+
+class ShareLink(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    token: str = Field(index=True, unique=True)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+#function to generate a link that you can share to let a friend see your availability so that we can find the free time in common
+@app.post("/share/generate-link")
+def generate_share_link(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: SessionDep
+):
+    existing_link = session.exec(select(ShareLink).where(ShareLink.user_id == current_user.id)).first()
+    
+    if existing_link:
+        expiration_time = existing_link.created_at + datetime.timedelta(days=2)
+        if datetime.datetime.now() > expiration_time:
+            session.delete(existing_link)
+            session.commit()
+        else:
+            return {"share_url": f"http://localhost:3000/calendar/view/{existing_link.token}", "expires_at": expiration_time}
+
+    token = secrets.token_urlsafe(16)
+    
+    new_link = ShareLink(user_id=current_user.id, token=token)
+    session.add(new_link)
+    session.commit()
+    
+    expires_at = new_link.created_at + datetime.timedelta(days=2)
+    
+    return {"share_url": f"http://localhost:3000/calendar/view/{token}", "expires_at": expires_at}
+
+# We get a black and white schedule so that we can use it to find time in common
+@app.get("/share/view/{token}")
+def view_shared_calendar(
+    token: str,
+    date_start: datetime.date, 
+    date_end: datetime.date,
+    session: SessionDep
+):
+    link = session.exec(select(ShareLink).where(ShareLink.token == token)).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Invalid link")
+
+    if datetime.datetime.now() > (link.created_at + datetime.timedelta(days=2)):
+        session.delete(link)
+        session.commit()
+        raise HTTPException(status_code=410, detail="This link has expired.")
+
+    user = session.get(User, link.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    statement = select(BlockDB).where(
+        BlockDB.user_id == user.id,
+        BlockDB.start >= datetime.datetime.combine(date_start, datetime.time(0,0)),
+        BlockDB.end <= datetime.datetime.combine(date_end, datetime.time(23,59))
+    )
+    blocks = session.exec(statement).all()
+
+    public_schedule = []
+    for block in blocks:
+        public_schedule.append({
+            "start": block.start.isoformat(),
+            "end": block.end.isoformat(),
+            "status": "busy"
+        })
+
+    return {
+        "username": user.username,
+        "schedule": public_schedule
+    }
