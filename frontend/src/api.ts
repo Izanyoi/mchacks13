@@ -30,7 +30,7 @@ export interface TaskInput {
   name: string;
   priority: number;
   dueDate: string; // ISO string
-  estimatedTimeMinutes: number;
+  estimatedTime: number; // Seconds
   withFriend: boolean;
   start?: string;
   end?: string;
@@ -45,6 +45,7 @@ export interface Block {
   start: string; // ISO string
   end: string;   // ISO string
   title: string;
+  priority: number;
 }
 
 export const auth = {

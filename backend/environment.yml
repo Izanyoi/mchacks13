@@ -3,9 +3,10 @@ dependencies:
   - python=3.11.14
   - python-multipart
   - sqlmodel
-  - pwdlib
   - pydantic
   - uvicorn
   - pyjwt
   - fastapi
-prefix: /opt/homebrew/Caskroom/miniconda/base/envs/mchacks13
+  - pip
+  - pip:
+      - pwdlib

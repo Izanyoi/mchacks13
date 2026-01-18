@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import CalendarHeader from "./CalendarHeader";
 import WeekView from "./WeekView";
 import EventModal from "./EventModal";
+import AuthModal from "./AuthModal";
 import { tasks, schedule, type Block } from "./api";
 
 interface Event {
@@ -10,17 +11,27 @@ interface Event {
   date: Date;
   duration: number;
   color: string;
+  priority: number;
 }
+
+export const PRIORITY_COLORS: Record<number, string> = {
+  1: "bg-blue-500",
+  2: "bg-green-500",
+  3: "bg-yellow-500",
+  4: "bg-orange-500",
+  5: "bg-red-500",
+};
 
 export default function GoogleCalendar({ initialEvents }: { initialEvents: Event[] }) {
   const [events, setEvents] = useState<Event[]>(initialEvents);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
-  const [newEvent, setNewEvent] = useState<{ title: string, date: Date, duration: number, color: string }>({
+  const [newEvent, setNewEvent] = useState<{ title: string, date: Date, duration: number, color: string, priority: number }>({
     title: "",
     date: new Date(),
     duration: 1,
     color: "bg-blue-500",
+    priority: 1,
   });
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -72,7 +83,8 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
           title: block.title,
           date: startDate,
           duration: duration,
-          color: "bg-blue-500", // Default color
+          color: PRIORITY_COLORS[block.priority] || "bg-blue-500",
+          priority: block.priority,
         };
       });
       setEvents(mappedEvents);
@@ -110,6 +122,7 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
       date: newDate,
       duration: 1,
       color: "bg-blue-500",
+      priority: 1,
     });
     setShowModal(true);
   };
@@ -125,9 +138,9 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
     try {
       await tasks.add({
         name: eventData.title,
-        priority: 1,
+        priority: eventData.priority,
         dueDate: end.toISOString(),
-        estimatedTimeMinutes: eventData.duration * 60,
+        estimatedTime: eventData.duration * 3600, // Convert hours to seconds
         withFriend: false,
         start: start.toISOString(),
         end: end.toISOString(),
@@ -207,6 +220,7 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
         hours={hours}
         formatHour={formatHour}
       />
+      <AuthModal />
     </div>
   );
 }
