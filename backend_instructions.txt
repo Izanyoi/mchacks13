@@ -1,0 +1,52 @@
+The frontend has been successfully connected to the backend using `frontend/src/api.ts`.
+The `Calendar.tsx` component is now using typed API calls to fetch, create, and delete events.
+
+However, to fully support all calendar features (like dragging and dropping events to move them), the backend needs to be updated.
+
+## Recommended Backend Changes
+
+### 1. Add an Endpoint to Update Blocks (Move/Resize)
+Currently, there is no way to change the start/end time of a scheduled block. You should add a `PATCH` endpoint.
+
+**File:** `backend/app/main.py`
+
+**Add this Pydantic model:**
+```python
+class BlockUpdate(BaseModel):
+    start: datetime.datetime | None = None
+    end: datetime.datetime | None = None
+```
+
+**Add this endpoint:**
+```python
+@app.patch("/tasks/block/{block_id}")
+async def update_block(
+    block_id: int, 
+    block_update: BlockUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)], 
+    session: SessionDep
+):
+    statement = select(BlockDB).where(
+        BlockDB.user_id == current_user.id,
+        BlockDB.id == block_id
+    )
+    block = session.exec(statement).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+    
+    if block_update.start:
+        block.start = block_update.start
+    if block_update.end:
+        block.end = block_update.end
+        
+    session.add(block)
+    session.commit()
+    session.refresh(block)
+    return block
+```
+
+### 2. Verify CORS
+Ensure that the `allow_origins` list in `app.add_middleware(CORSMiddleware, ...)` includes the URL where your frontend is running (default `http://localhost:5173` for Vite). It is currently set up correctly for localhost.
+
+### 3. Database Migration
+If you modify the models (like adding fields to `TaskDB` or `BlockDB`), remember to handle database migrations or reset the database if still in development (delete `database.db`).

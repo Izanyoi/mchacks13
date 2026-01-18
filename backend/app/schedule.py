@@ -77,30 +77,24 @@ class Schedule:
             self.schedule.append(newBlock)
         #need automatic algorithm still
         else:
-            half: datetime.timedelta = (task.dueDate.date() - datetime.date.today())/2
-            current: datetime.date = datetime.date.today() + half
+            fraction: float = (task.priority - 1)/4
+            current: datetime.date = datetime.date.today() + (task.dueDate.date() - datetime.date.today()) * fraction
+            
+            n = (task.dueDate.date() - datetime.date.today()).days
 
-            minDate = current
-            minValue = self.howBusy(current)
-            for i in range(1,16):
-                value = self.howBusy(current + i*datetime.timedelta(days=1))
-                if i <= 5:
+            minDate = datetime.date(3000,12,31)
+            minValue = float("inf")
+            for i in range(n+1):
+                day = datetime.date.today() + i*datetime.timedelta(days=1)
+                value = self.howBusy(day)
+                m = abs((day - current).days)
+                if m <= 5:
                     value += (0.2*i + 1)*value
                 else:
                     value *= 2
-                if value < minValue:
+                if value <= minValue and abs(day-current) < abs(minDate-current):
                     minValue = value
-                    minDate = current + i*datetime.timedelta(days=1)
-
-            for i in range(1,16):
-                value = self.howBusy(current - i*datetime.timedelta(days=1))
-                if i <= 5:
-                    value += (0.2*i + 1)*value
-                else:
-                    value *= 2
-                if value < minValue:
-                    minValue = value
-                    minDate = current - i*datetime.timedelta(days=1)
+                    minDate = day
             
             for j in range(24 - task.estimatedTime.seconds // 3600):
                 if self.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0), minDate):
@@ -127,11 +121,13 @@ class Schedule:
                     return False
 
         return True
+    
+    
 
 #test cases:
-task1 = Task("task1", 4, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=3), False)
+task1 = Task("task1", 3, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=3), False)
 task2 = Task("task2", 4, datetime.datetime(2026, 1, 27), datetime.timedelta(hours=4), False)
-task3 = Task("task3", 4, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=2), False)
+task3 = Task("task3", 1, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=2), False)
 
 schedule1 = Schedule()
 schedule1.addBlock(task1)
