@@ -1,7 +1,7 @@
 import datetime
 from math import ceil
 
-print(datetime.time(23,59).hour)
+print(datetime.time(0,0) > datetime.time(1,0))
 
 class NoZone:
     def __init__(self, start: datetime.time, end: datetime.time):
@@ -61,7 +61,7 @@ class Schedule:
     def howBusy(self, day: datetime.date):
         total = 0
         for block in self.getSchedule():
-            if block.start.date == day:
+            if block.start.date() == day:
                 total += (block.end - block.start).seconds // 3600
         return total
     
@@ -105,15 +105,10 @@ class Schedule:
                     minValue = value
                     minDate = current - i*datetime.timedelta(days=1)
             
-            for j in range(24 - task.estimatedTime):
-                if self.is_free(task.start.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0)):
+            for j in range(24 - task.estimatedTime.seconds // 3600):
+                if self.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0)):
                     #need to change for edgecase of midnight for end date
                     self.schedule.append(Block(task, datetime.datetime(minDate.year, minDate.month, minDate.day, j), datetime.datetime(minDate.year, minDate.month, minDate.day, j + task.estimatedTime.seconds//3600)))
-                
-                    
-
-        
-
 
     def changeNoZones(self, newNoZones: list[list[NoZone]]):
         self.noZones = newNoZones
