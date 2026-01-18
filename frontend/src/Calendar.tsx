@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import CalendarHeader from "./CalendarHeader";
 import WeekView from "./WeekView";
 import EventModal from "./EventModal";
-import { tasks, schedule } from "./api";
+import { tasks, schedule, type Block } from "./api";
 
 interface Event {
   id: number;
@@ -63,7 +63,7 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
   const fetchEvents = async () => {
     try {
       const blocks = await schedule.get();
-      const mappedEvents = blocks.map((block: any) => {
+      const mappedEvents = blocks.map((block: Block) => {
         const startDate = new Date(block.start);
         const endDate = new Date(block.end);
         const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
