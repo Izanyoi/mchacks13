@@ -119,9 +119,7 @@ class Schedule:
     def is_free(self, day_index, start, end):
         # NoZones
         for zone in self.noZones[day_index]:
-            zone_start = datetime.combine(start, zone.start)
-            zone_end = datetime.combine(start, zone.end)
-            if self.overlaps(start, end, zone_start, zone_end):
+            if self.overlaps(start, end, zone.start, zone.end):
                 return False
 
         # Existing blocks
