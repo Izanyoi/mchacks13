@@ -32,32 +32,44 @@ export default function CalendarHeader({
           <h1 className="text-2xl text-gray-800">Calendar</h1>
           <button
             onClick={onToday}
-            className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
+            className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 text-gray-700 bg-white"
           >
             Today
           </button>
           <div className="flex items-center gap-2">
             <button
               onClick={onPreviousWeek}
-              className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+              className="p-2 hover:bg-gray-100 rounded-full text-gray-600 bg-white"
             >
               &lt;
             </button>
             <button
               onClick={onNextWeek}
-              className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
+              className="p-2 hover:bg-gray-100 rounded-full text-gray-600 bg-white"
             >
               &gt;
             </button>
+
           </div>
           <h2 className="text-xl text-gray-700">{monthYearDisplay}</h2>
         </div>
-        <button
-          onClick={onOpenCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700"
-        >
-          Create
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              localStorage.removeItem("hasVisited");
+              window.location.reload();
+            }}
+            className="px-4 py-2 text-sm text-red-600 border border-red-200 bg-red-50 rounded-full hover:bg-red-100 font-medium"
+          >
+            Logout
+          </button>
+          <button
+            onClick={onOpenCreateModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700"
+          >
+            Create
+          </button>
+        </div>
       </div>
     </div>
   );

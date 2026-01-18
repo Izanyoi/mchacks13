@@ -449,7 +449,8 @@ def get_schedule(
             "task_id": block.task_id,
             "start": block.start.isoformat(),
             "end": block.end.isoformat(),
-            "title": task.name
+            "title": task.name,
+            "priority": task.priority
         })
 
     return output

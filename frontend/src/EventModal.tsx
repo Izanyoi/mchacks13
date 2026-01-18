@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 interface Event {
   id: number;
@@ -6,6 +6,7 @@ interface Event {
   date: Date;
   duration: number;
   color: string;
+  priority: number;
 }
 
 interface EventModalProps {
@@ -47,8 +48,9 @@ export default function EventModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-96 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-lg shadow-xl w-96 p-6">
         <h2 className="text-xl font-semibold mb-4 text-gray-900">
           Create Event
         </h2>
@@ -141,23 +143,28 @@ export default function EventModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Color
+              Priority
             </label>
             <div className="flex gap-2">
-              {[
-                "bg-blue-500",
-                "bg-green-500",
-                "bg-purple-500",
-                "bg-red-500",
-                "bg-yellow-500",
-                "bg-pink-500",
-              ].map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setCurrentEvent({ ...currentEvent, color })}
-                  className={`w-8 h-8 rounded ${color} ${currentEvent.color === color ? "ring-2 ring-offset-2 ring-gray-400" : ""}`}
-                />
-              ))}
+              {[1, 2, 3, 4, 5].map((p) => {
+                const PRIORITY_COLORS: Record<number, string> = {
+                  1: "bg-blue-500",
+                  2: "bg-green-500",
+                  3: "bg-yellow-500",
+                  4: "bg-orange-500",
+                  5: "bg-red-500",
+                };
+                const color = PRIORITY_COLORS[p];
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentEvent({ ...currentEvent, priority: p, color: color })}
+                    className={`w-8 h-8 rounded flex items-center justify-center text-white font-bold text-xs ${color} ${currentEvent.priority === p ? "ring-2 ring-offset-2 ring-gray-400" : ""}`}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
