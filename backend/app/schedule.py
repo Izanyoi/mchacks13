@@ -20,6 +20,9 @@ class Task:
         self.maxTime = None
         self.MAX_BLOCK_DURATION = MAX_BLOCK_DURATION
 
+    def changeEstimatedTime(self, time: datetime.timedelta):
+        self.estimatedTime = time
+
     def advancedOptions(self, start: datetime.datetime, end: datetime.datetime, instances: int, minTime: datetime.time, maxTime: datetime.time):
         self.start = start
         self.end = end
@@ -69,6 +72,30 @@ class Schedule:
             total += noZone.end.hour + ceil(noZone.end.minute/60) - noZone.start.hour
         return 24 - total
 
+    def getValue(self, day: datetime.date, current, i, z=5):
+        value = self.howBusy(day)
+        m = abs((day - current).days)
+        if m <= z:
+            value += (0.2*i + 1)*value
+        else:
+            value *= 2
+        return value
+
+    def findMinDate(self, task):
+        fraction: float = (task.priority - 1)/4
+        current: datetime.date = datetime.date.today() + (task.dueDate.date() - datetime.date.today()) * fraction
+            
+        n = (task.dueDate.date() - datetime.date.today()).days
+
+        minDate = datetime.date(3000,12,31)
+        minValue = float("inf")
+        for i in range(n+1):
+            day = datetime.date.today() + i*datetime.timedelta(days=1)
+            value = self.getValue(day, current, i)
+            if value <= minValue and abs(day-current) < abs(minDate-current):
+                minValue = value
+                minDate = day
+        return minValue, minDate
     
     def addBlock(self, task: Task, start = None, end = None):
         #adding manually
@@ -77,24 +104,13 @@ class Schedule:
             self.schedule.append(newBlock)
         #need automatic algorithm still
         else:
-            fraction: float = (task.priority - 1)/4
-            current: datetime.date = datetime.date.today() + (task.dueDate.date() - datetime.date.today()) * fraction
+            if (task.estimatedTime.seconds//3600) >= 5:
+                new_task = Task(task.name, task.priority, task.dueDate, datetime.timedelta(hours=3), 
+                                task.withFriend, task.MAX_BLOCK_DURATION)
+                task.changeEstimatedTime(task.estimatedTime - datetime.timedelta(hours=3))
+                self.addBlock(new_task)
             
-            n = (task.dueDate.date() - datetime.date.today()).days
-
-            minDate = datetime.date(3000,12,31)
-            minValue = float("inf")
-            for i in range(n+1):
-                day = datetime.date.today() + i*datetime.timedelta(days=1)
-                value = self.howBusy(day)
-                m = abs((day - current).days)
-                if m <= 5:
-                    value += (0.2*i + 1)*value
-                else:
-                    value *= 2
-                if value <= minValue and abs(day-current) < abs(minDate-current):
-                    minValue = value
-                    minDate = day
+            minValue, minDate = self.findMinDate(task)
             
             for j in range(24 - task.estimatedTime.seconds // 3600):
                 if self.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0), minDate):
@@ -121,18 +137,66 @@ class Schedule:
                     return False
 
         return True
-    
-    
+
+def addTwinBlocks(schedule1: Schedule, schedule2: Schedule, task, start = None, end = None):
+    #adding manually
+    if start != None and end != None:
+        newBlock = Block(task, start, end)
+        schedule1.getSchedule.append(newBlock)
+        schedule2.getSchedule.append(newBlock)
+    #need automatic algorithm still
+    else:
+        if (task.estimatedTime.seconds//3600) >= 5:
+            new_task = Task(task.name, task.priority, task.dueDate, datetime.timedelta(hours=3), 
+                            task.withFriend, task.MAX_BLOCK_DURATION)
+            task.changeEstimatedTime(task.estimatedTime - datetime.timedelta(hours=3))
+            addTwinBlocks(schedule1, schedule2, new_task)
+        
+        fraction: float = (task.priority - 1)/4
+        current: datetime.date = datetime.date.today() + (task.dueDate.date() - datetime.date.today()) * fraction
+            
+        n = (task.dueDate.date() - datetime.date.today()).days
+
+        minDate = datetime.date(3000,12,31)
+        minValue = float("inf")
+        difference = float("inf")
+        for i in range(n+1):
+            day = datetime.date.today() + i*datetime.timedelta(days=1)
+            value1 = schedule1.getValue(day, current, i)
+            value2 = schedule2.getValue(day, current, i)
+            if value1 + value2 < minValue:
+                minDate= day
+                minValue = value1 + value2
+                difference = abs(value1-value2)
+            elif value1 + value2 == minValue:
+                if abs(value1-value2) < difference:
+                    minDate= day
+                    minValue = value1 + value2
+                    difference = abs(value1-value2)
+                elif  abs(value1-value2) == difference and abs(day-current) < abs(minDate-current):
+                    minDate= day
+                    minValue = value1 + value2
+                    difference = abs(value1-value2)
+            
+        for j in range(24 - task.estimatedTime.seconds // 3600):
+            if schedule1.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0), minDate) and schedule2.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0), minDate):
+                #need to change for edgecase of midnight for end date
+                schedule1.getSchedule().append(Block(task, datetime.datetime(minDate.year, minDate.month, minDate.day, j), datetime.datetime(minDate.year, minDate.month, minDate.day, j + task.estimatedTime.seconds//3600)))
+                schedule2.getSchedule().append(Block(task, datetime.datetime(minDate.year, minDate.month, minDate.day, j), datetime.datetime(minDate.year, minDate.month, minDate.day, j + task.estimatedTime.seconds//3600)))
+                break
 
 #test cases:
 task1 = Task("task1", 3, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=3), False)
-task2 = Task("task2", 4, datetime.datetime(2026, 1, 27), datetime.timedelta(hours=4), False)
+task2 = Task("task2", 4, datetime.datetime(2026, 1, 27), datetime.timedelta(hours=5), False)
 task3 = Task("task3", 1, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=2), False)
 
 schedule1 = Schedule()
+schedule2 = Schedule()
 schedule1.addBlock(task1)
 schedule1.addBlock(task2)
-schedule1.addBlock(task3)
-print(schedule1.schedule[0].start)
-print(schedule1.schedule[1].start)
-print(schedule1.schedule[2].start)
+addTwinBlocks(schedule1, schedule2, task3)
+print(schedule1.schedule[0].start, schedule1.schedule[0].end)
+print(schedule1.schedule[1].start, schedule1.schedule[1].end)
+print(schedule1.schedule[2].start, schedule1.schedule[2].end)
+print(schedule1.schedule[3].start, schedule1.schedule[3].end)
+print(schedule2.schedule[0].start, schedule2.schedule[0].end)
