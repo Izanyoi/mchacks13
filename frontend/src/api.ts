@@ -111,3 +111,21 @@ export const schedule = {
     return response.data;
   },
 };
+
+export const share = {
+  generateLink: async (): Promise<{ share_url: string; expires_at: string }> => {
+    await auth.ensureLoggedIn();
+    const response = await api.post<{ share_url: string; expires_at: string }>("/share/generate-link");
+    return response.data;
+  },
+  view: async (token: string, dateStart: string, dateEnd: string): Promise<{ username: string; schedule: { start: string; end: string; status: string }[] }> => {
+    // No ensureLoggedIn() here
+    const response = await api.get<{ username: string; schedule: { start: string; end: string; status: string }[] }>(`/share/view/${token}`, {
+      params: {
+        date_start: dateStart,
+        date_end: dateEnd
+      }
+    });
+    return response.data;
+  }
+};

@@ -13,6 +13,7 @@ interface CalendarHeaderProps {
   onNextWeek: () => void;
   onToday: () => void;
   onOpenCreateModal: () => void;
+  onShare: () => void;
   monthYearDisplay: string;
   events: Event[];
 }
@@ -22,6 +23,7 @@ export default function CalendarHeader({
   onNextWeek,
   onToday,
   onOpenCreateModal,
+  onShare,
   monthYearDisplay,
   events,
 }: CalendarHeaderProps) {
@@ -54,6 +56,12 @@ export default function CalendarHeader({
           <h2 className="text-xl text-gray-700">{monthYearDisplay}</h2>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={onShare}
+            className="px-4 py-2 text-sm text-blue-600 border border-blue-200 bg-blue-50 rounded-full hover:bg-blue-100 font-medium"
+          >
+            Share
+          </button>
           <button
             onClick={() => {
               localStorage.removeItem("hasVisited");

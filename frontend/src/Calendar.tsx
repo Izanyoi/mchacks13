@@ -3,7 +3,7 @@ import CalendarHeader from "./CalendarHeader";
 import WeekView from "./WeekView";
 import EventModal from "./EventModal";
 import AuthModal from "./AuthModal";
-import { tasks, schedule, type Block } from "./api";
+import { tasks, schedule, share, type Block } from "./api";
 
 interface Event {
   id: number;
@@ -26,6 +26,9 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
   const [events, setEvents] = useState<Event[]>(initialEvents);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
+  const [isSharedMode, setIsSharedMode] = useState(false);
+  const [sharedUsername, setSharedUsername] = useState("");
+
   const [newEvent, setNewEvent] = useState<{ title: string, date: Date, duration: number, color: string, priority: number }>({
     title: "",
     date: new Date(),
@@ -93,8 +96,46 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
     }
   };
 
+  const fetchSharedEvents = async (token: string) => {
+    try {
+      // Fetch a wide range, e.g. +/- 1 year
+      const now = new Date();
+      const start = new Date(now.getFullYear() - 1, 0, 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear() + 1, 11, 31).toISOString().split('T')[0];
+
+      const data = await share.view(token, start, end);
+      setSharedUsername(data.username);
+      setIsSharedMode(true);
+
+      const mappedEvents = data.schedule.map((slot, index) => {
+        const startDate = new Date(slot.start);
+        const endDate = new Date(slot.end);
+        const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+
+        return {
+          id: -index, // Negative ID for readonly
+          title: "Busy", // Anonymized
+          date: startDate,
+          duration: duration,
+          color: "bg-gray-400", // Gray for shared/readonly
+          priority: 0
+        };
+      });
+      setEvents(mappedEvents);
+    } catch (e) {
+      console.error("Failed to fetch shared events", e);
+      alert("Invalid or expired share link.");
+    }
+  };
+
   useEffect(() => {
-    fetchEvents();
+    const path = window.location.pathname;
+    const match = path.match(/\/calendar\/view\/(.+)/);
+    if (match) {
+      fetchSharedEvents(match[1]);
+    } else {
+      fetchEvents();
+    }
   }, []);
 
   const goToPreviousWeek = () => {
@@ -165,7 +206,18 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
   };
 
   const handleTimeSlotClick = (date: Date, hour: number) => {
+    if (isSharedMode) return; // Disable creating events in shared mode
     openCreateModal(date, hour);
+  };
+
+  const handleShare = async () => {
+    try {
+      const result = await share.generateLink();
+      window.prompt("Copy this link to share your calendar:", result.share_url);
+    } catch (e) {
+      console.error("Failed to generate share link", e);
+      alert("Failed to generate share link");
+    }
   };
 
   const isToday = (date: Date) => {
@@ -194,7 +246,8 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
         onNextWeek={goToNextWeek}
         onToday={goToToday}
         onOpenCreateModal={() => openCreateModal(new Date(), 9)}
-        monthYearDisplay={getMonthYearDisplay()}
+        onShare={handleShare}
+        monthYearDisplay={isSharedMode ? `Viewing ${sharedUsername}'s Calendar` : getMonthYearDisplay()}
         events={events}
       />
 

@@ -504,7 +504,7 @@ def generate_share_link(
             session.delete(existing_link)
             session.commit()
         else:
-            return {"share_url": f"http://localhost:3000/calendar/view/{existing_link.token}", "expires_at": expiration_time}
+            return {"share_url": f"http://localhost:5173/calendar/view/{existing_link.token}", "expires_at": expiration_time}
 
     token = secrets.token_urlsafe(16)
     
@@ -514,7 +514,7 @@ def generate_share_link(
     
     expires_at = new_link.created_at + datetime.timedelta(days=2)
     
-    return {"share_url": f"http://localhost:3000/calendar/view/{token}", "expires_at": expires_at}
+    return {"share_url": f"http://localhost:5173/calendar/view/{token}", "expires_at": expires_at}
 
 # We get a black and white schedule so that we can use it to find time in common
 @app.get("/share/view/{token}")

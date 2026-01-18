@@ -11,6 +11,11 @@ export default function AuthModal() {
     const [error, setError] = useState("");
 
     useEffect(() => {
+        // If viewing a shared calendar, do not show auth modal
+        if (window.location.pathname.includes("/calendar/view/")) {
+            return;
+        }
+
         const hasVisited = localStorage.getItem("hasVisited");
         const token = localStorage.getItem("token");
         if (!hasVisited || !token) {
