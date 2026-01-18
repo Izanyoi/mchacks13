@@ -1,5 +1,7 @@
-from datetime import datetime, timedelta, time
+import datetime
 from math import ceil
+
+print(datetime.time(23,59).hour)
 
 class NoZone:
     def __init__(self, start: datetime.time, end: datetime.time):
@@ -7,7 +9,7 @@ class NoZone:
         self.end = end       
 
 class Task:
-    def __init__(self, name: str, priority: int, dueDate: datetime.datetime, estimatedTime:datetime.timedelta, withFriend: bool, MAX_BLOCK_DURATION: timedelta = timedelta(hours=3)):
+    def __init__(self, name: str, priority: int, dueDate: datetime.datetime, estimatedTime:datetime.timedelta, withFriend: bool, MAX_BLOCK_DURATION: datetime.timedelta = datetime.timedelta(hours=3)):
         self.name = name
         self.priority = priority
         self.dueDate = dueDate
@@ -39,8 +41,8 @@ class Block:
 
 class Schedule:
     def __init__(self, WORK_START: int = 9, WORK_END: int = 21):
-        self.WORK_START = 9
-        self.WORK_END = 21    
+        self.WORK_START = WORK_START
+        self.WORK_END = WORK_END
         self.schedule: list[Block] = []
         self.noZones = [[NoZone(datetime.time(0, 0), datetime.time(self.WORK_START, 0)), NoZone(datetime.time(self.WORK_END, 0), datetime.time(23, 59))],
                         [NoZone(datetime.time(0, 0), datetime.time(self.WORK_START, 0)), NoZone(datetime.time(self.WORK_END, 0), datetime.time(23, 59))],
@@ -56,12 +58,62 @@ class Schedule:
     def getSchedule(self):
         return self.schedule
     
-    def addTask(self, task: Task, start = None, end = None):
+    def howBusy(self, day: datetime.date):
+        total = 0
+        for block in self.getSchedule():
+            if block.start.date == day:
+                total += (block.end - block.start).seconds // 3600
+        return total
+    
+    def totalTime(self, day: datetime.date):
+        total = 0 
+        for noZone in self.noZones[day.weekday()]:
+            total += noZone.end.hour + ceil(noZone.end.minute/60) - noZone.start.hour
+        return 24 - total
+
+    
+    def addBlock(self, task: Task, start = None, end = None):
         #adding manually
         if start != None and end != None:
             newBlock = Block(task, start, end)
             self.schedule.append(newBlock)
         #need automatic algorithm still
+        else:
+            half: datetime.timedelta = (task.dueDate.date() - datetime.date.today())/2
+            current: datetime.date = datetime.date.today() + half
+
+            minDate = current
+            minValue = self.howBusy(current)
+
+            for i in range(1,16):
+                value = self.howBusy(current + i*datetime.timedelta(days=1))
+                if i <= 5:
+                    value += (0.2*i + 1)*value
+                else:
+                    value *= 2
+                if value < minValue:
+                    minValue = value
+                    minDate = current + i*datetime.timedelta(days=1)
+
+            for i in range(1,16):
+                value = self.howBusy(current - i*datetime.timedelta(days=1))
+                if i <= 5:
+                    value += (0.2*i + 1)*value
+                else:
+                    value *= 2
+                if value < minValue:
+                    minValue = value
+                    minDate = current - i*datetime.timedelta(days=1)
+            
+            for j in range(24 - task.estimatedTime):
+                if self.is_free(task.start.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0)):
+                    #need to change for edgecase of midnight for end date
+                    self.schedule.append(Block(task, datetime.datetime(minDate.year, minDate.month, minDate.day, j), datetime.datetime(minDate.year, minDate.month, minDate.day, j + task.estimatedTime.seconds//3600)))
+                
+                    
+
+        
+
 
     def changeNoZones(self, newNoZones: list[list[NoZone]]):
         self.noZones = newNoZones
@@ -72,8 +124,8 @@ class Schedule:
     def is_free(self, day_index, start, end):
         # NoZones
         for zone in self.noZones[day_index]:
-            zone_start = datetime.combine(start.date(), zone.start)
-            zone_end = datetime.combine(start.date(), zone.end)
+            zone_start = datetime.combine(start, zone.start)
+            zone_end = datetime.combine(start, zone.end)
             if self.overlaps(start, end, zone_start, zone_end):
                 return False
 
@@ -84,29 +136,3 @@ class Schedule:
                     return False
 
         return True
-
-
-def schedule_task(task, schedule, num_days=31):
-    task.calculate_instances()
-    block_duration = task.estimatedTime / task.instances
-    placed = 0
-
-    for day_offset in range(num_days):
-        if placed >= task.instances:
-            break
-
-        date = datetime.now().date() + timedelta(days=day_offset)
-        day_index = day_offset % 7
-
-        for hour in range(schedule.WORK_START, schedule.WORK_END):
-            if placed >= task.instances:
-                break
-
-            start = datetime.combine(date, time(hour, 0))
-            end = start + block_duration
-
-            if schedule.is_free(day_index, start, end):
-                schedule.addTask(task, start, end)
-                placed += 1
-
-    return placed == task.instances
