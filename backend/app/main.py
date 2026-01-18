@@ -84,6 +84,15 @@ class Task:
         self.minTime = None
         self.maxTime = None
         self.MAX_BLOCK_DURATION = MAX_BLOCK_DURATION
+    
+    def advancedOptions(self, start: datetime.datetime, end: datetime.datetime, minTime: datetime.time, maxTime: datetime.time, instances: int = 1):
+        self.start = start
+        self.end = end
+        if instances:
+            self.instances = instances
+        self.instances = instances
+        self.minTime = minTime
+        self.maxTime = maxTime
 
 class Schedule:
     def __init__(self, session: Session, user_id: int, WORK_START: int = 9, WORK_END: int = 21):
@@ -321,8 +330,8 @@ class TaskInput(BaseModel):
     start: datetime.datetime | None = None
     end: datetime.datetime | None = None
     instances: int | None = 1
-    minTime: str | None = None 
-    maxTime: str | None = None
+    minTime: datetime.time | None = None 
+    maxTime: datetime.time | None = None
 
 @app.patch("/users/me/name", response_model=UserPublic)
 async def update_user_name(
@@ -374,8 +383,14 @@ def add_task(
         estimatedTime=datetime.timedelta(minutes=task_in.estimatedTimeMinutes),
         withFriend=task_in.withFriend
     )
-    if task_in.start: task_logic.start = task_in.start
-    if task_in.end: task_logic.end = task_in.end
+    
+    task_logic.advancedOptions(
+        start=task_in.start,
+        end=task_in.end,
+        instances=task_in.instances,
+        minTime=task_in.minTime,
+        maxTime=task_in.maxTime
+    )
 
     schedule_engine = Schedule(session=session, user_id=current_user.id)
 
@@ -459,6 +474,7 @@ class ShareLink(SQLModel, table=True):
     token: str = Field(index=True, unique=True)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+#function to generate a link that you can share to let a friend see your availability so that we can find the free time in common
 @app.post("/share/generate-link")
 def generate_share_link(
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -484,6 +500,7 @@ def generate_share_link(
     
     return {"share_url": f"http://localhost:3000/calendar/view/{token}", "expires_at": expires_at}
 
+# We get a black and white schedule so that we can use it to find time in common
 @app.get("/share/view/{token}")
 def view_shared_calendar(
     token: str,
