@@ -561,11 +561,8 @@ def view_shared_calendar(
 def addTwinBlocks(
     current_user: Annotated[User, Depends(get_current_active_user)],
     token: str,
-    date_start: datetime.date, 
-    date_end: datetime.date,
     session: SessionDep,
-    task_in: TaskInput,
-    start = None, end = None
+    task_in: TaskInput
 ):
     link = session.exec(select(ShareLink).where(ShareLink.token == token)).first()
     if not link:
