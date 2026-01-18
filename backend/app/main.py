@@ -1,4 +1,4 @@
-from datetime import time, datetime, timedelta, timezone, date
+import datetime
 from typing import Annotated, List
 from math import ceil
 import jwt
@@ -50,7 +50,7 @@ class TaskDB(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     name: str
     priority: int
-    due_date: datetime
+    due_date: datetime.datetime
     estimated_minutes: int
     with_friend: bool
     instances: int = 1
@@ -59,19 +59,19 @@ class BlockDB(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     task_id: int = Field(foreign_key="taskdb.id")
-    start: datetime
-    end: datetime
+    start: datetime.datetime
+    end: datetime.datetime
 
-DEFAULT_MAX_BLOCK_DURATION = timedelta(hours=3)
+DEFAULT_MAX_BLOCK_DURATION = datetime.timedelta(hours=3)
 
 class NoZone:
-    def __init__(self, start: time, end: time):
+    def __init__(self, start: datetime.time, end: datetime.time):
         self.start = start
         self.end = end      
 
 class Task:
     """Logical representation of a task for the algorithm"""
-    def __init__(self, name: str, priority: int, dueDate: datetime, estimatedTime: timedelta, withFriend: bool, MAX_BLOCK_DURATION: timedelta = timedelta(hours=3)):
+    def __init__(self, name: str, priority: int, dueDate: datetime.datetime, estimatedTime: datetime.timedelta, withFriend: bool, MAX_BLOCK_DURATION: datetime.timedelta = datetime.timedelta(hours=3)):
         self.name = name
         self.priority = priority
         self.dueDate = dueDate
@@ -105,7 +105,7 @@ class Schedule:
     def getSchedule(self):
         return self.schedule
     
-    def howBusy(self, day: date):
+    def howBusy(self, day: datetime.date):
         total = 0
         for block in self.getSchedule():
             if block.start.date() == day:
@@ -116,9 +116,12 @@ class Schedule:
         return a_start < b_end and b_start < a_end
 
     def is_free(self, day_index, start, end):
+        start_time = start.time()
+        end_time = end.time()
+        
         # NoZones
         for zone in self.noZones[day_index]:
-            if self.overlaps(start, end, zone.start, zone.end):
+            if self.overlaps(start_time, end_time, zone.start, zone.end):
                 return False
 
         # Existing blocks
@@ -174,8 +177,8 @@ class Schedule:
         duration = task.estimatedTime.seconds // 3600
 
         for j in range(24 - duration):
-            start_dt = datetime.combine(minDate, time(j, 0)) 
-            end_dt = datetime.combine(minDate, time(j + duration, 0))
+            start_dt = datetime.datetime.combine(minDate, datetime.time(j, 0)) 
+            end_dt = datetime.datetime.combine(minDate, datetime.time(j + duration, 0))
 
             if self.is_free(minDate.weekday(), start_dt, end_dt):
                 newBlock = BlockDB(
@@ -201,9 +204,9 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return password_hash.hash(password)
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: datetime.timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
+    expire = datetime.datetime.now(datetime.timezone.utc) + (expires_delta or datetime.timedelta(minutes=15))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -290,7 +293,7 @@ async def login_for_access_token(
 
     access_token = create_access_token(
         data={"sub": user.username},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        expires_delta=datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
     return {
@@ -311,11 +314,11 @@ def health_check():
 class TaskInput(BaseModel):
     name: str
     priority: int
-    dueDate: datetime
+    dueDate: datetime.datetime
     estimatedTimeMinutes: int
     withFriend: bool
-    start: datetime | None = None
-    end: datetime | None = None
+    start: datetime.datetime | None = None
+    end: datetime.datetime | None = None
     instances: int | None = 1
     minTime: str | None = None 
     maxTime: str | None = None
@@ -367,7 +370,7 @@ def add_task(
         name=task_in.name,
         priority=task_in.priority,
         dueDate=task_in.dueDate,
-        estimatedTime=timedelta(minutes=task_in.estimatedTimeMinutes),
+        estimatedTime=datetime.timedelta(minutes=task_in.estimatedTimeMinutes),
         withFriend=task_in.withFriend
     )
     if task_in.start: task_logic.start = task_in.start
