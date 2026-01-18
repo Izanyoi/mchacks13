@@ -1,8 +1,6 @@
 import datetime
 from math import ceil
 
-print(datetime.time(0,0) > datetime.time(1,0))
-
 class NoZone:
     def __init__(self, start: datetime.time, end: datetime.time):
         self.start = start
@@ -84,7 +82,6 @@ class Schedule:
 
             minDate = current
             minValue = self.howBusy(current)
-
             for i in range(1,16):
                 value = self.howBusy(current + i*datetime.timedelta(days=1))
                 if i <= 5:
@@ -106,9 +103,10 @@ class Schedule:
                     minDate = current - i*datetime.timedelta(days=1)
             
             for j in range(24 - task.estimatedTime.seconds // 3600):
-                if self.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0)):
+                if self.is_free(minDate.weekday(), datetime.time(j, 0), datetime.time(j + task.estimatedTime.seconds // 3600, 0), minDate):
                     #need to change for edgecase of midnight for end date
                     self.schedule.append(Block(task, datetime.datetime(minDate.year, minDate.month, minDate.day, j), datetime.datetime(minDate.year, minDate.month, minDate.day, j + task.estimatedTime.seconds//3600)))
+                    break
 
     def changeNoZones(self, newNoZones: list[list[NoZone]]):
         self.noZones = newNoZones
@@ -116,7 +114,7 @@ class Schedule:
     def overlaps(self, a_start, a_end, b_start, b_end):
         return a_start < b_end and b_start < a_end
 
-    def is_free(self, day_index, start, end):
+    def is_free(self, day_index, start, end, date):
         # NoZones
         for zone in self.noZones[day_index]:
             if self.overlaps(start, end, zone.start, zone.end):
@@ -124,8 +122,21 @@ class Schedule:
 
         # Existing blocks
         for block in self.getSchedule():
-            if block.start.date() == start.date():
-                if self.overlaps(start, end, block.start, block.end):
+            if block.start.date() == date:
+                if self.overlaps(start, end, datetime.time(block.start.hour, block.start.minute),datetime.time(block.end.hour, block.end.minute)):
                     return False
 
         return True
+
+#test cases:
+task1 = Task("task1", 4, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=3), False)
+task2 = Task("task2", 4, datetime.datetime(2026, 1, 27), datetime.timedelta(hours=4), False)
+task3 = Task("task3", 4, datetime.datetime(2026, 1, 25), datetime.timedelta(hours=2), False)
+
+schedule1 = Schedule()
+schedule1.addBlock(task1)
+schedule1.addBlock(task2)
+schedule1.addBlock(task3)
+print(schedule1.schedule[0].start)
+print(schedule1.schedule[1].start)
+print(schedule1.schedule[2].start)
