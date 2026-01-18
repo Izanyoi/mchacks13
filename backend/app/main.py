@@ -256,7 +256,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -408,16 +408,17 @@ def get_schedule(
     current_user: Annotated[User, Depends(get_current_active_user)], 
     session: SessionDep
 ):
-    statement = select(BlockDB).where(BlockDB.user_id == current_user.id)
+    statement = select(BlockDB, TaskDB).join(TaskDB).where(BlockDB.user_id == current_user.id)
     results = session.exec(statement).all()
 
     output = []
-    for block in results:
+    for block, task in results:
         output.append({
             "block_id": block.id,
             "task_id": block.task_id,
             "start": block.start.isoformat(),
-            "end": block.end.isoformat()
+            "end": block.end.isoformat(),
+            "title": task.name
         })
 
     return output
