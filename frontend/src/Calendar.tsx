@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import CalendarHeader from "./CalendarHeader";
 import WeekView from "./WeekView";
 import EventModal from "./EventModal";
+import { tasks, schedule } from "./api";
 
 interface Event {
   id: number;
@@ -15,7 +16,7 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
   const [events, setEvents] = useState<Event[]>(initialEvents);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
-  const [newEvent, setNewEvent] = useState<{title: string, date: Date, duration: number, color: string}>({
+  const [newEvent, setNewEvent] = useState<{ title: string, date: Date, duration: number, color: string }>({
     title: "",
     date: new Date(),
     duration: 1,
@@ -59,6 +60,31 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
     return `${hour - 12} PM`;
   };
 
+  const fetchEvents = async () => {
+    try {
+      const blocks = await schedule.get();
+      const mappedEvents = blocks.map((block: any) => {
+        const startDate = new Date(block.start);
+        const endDate = new Date(block.end);
+        const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+        return {
+          id: block.block_id,
+          title: block.title,
+          date: startDate,
+          duration: duration,
+          color: "bg-blue-500", // Default color
+        };
+      });
+      setEvents(mappedEvents);
+    } catch (e) {
+      console.error("Failed to fetch events", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
   const goToPreviousWeek = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(newDate.getDate() - 7);
@@ -92,17 +118,37 @@ export default function GoogleCalendar({ initialEvents }: { initialEvents: Event
     setShowModal(false);
   };
 
-  const handleCreateEvent = (eventData: Omit<Event, "id">) => {
-    const event: Event = {
-      id: Date.now(),
-      ...eventData,
-    };
-    setEvents([...events, event]);
-    setShowModal(false);
+  const handleCreateEvent = async (eventData: Omit<Event, "id">) => {
+    const start = eventData.date;
+    const end = new Date(start.getTime() + eventData.duration * 60 * 60 * 1000);
+
+    try {
+      await tasks.add({
+        name: eventData.title,
+        priority: 1,
+        dueDate: end.toISOString(),
+        estimatedTimeMinutes: eventData.duration * 60,
+        withFriend: false,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        instances: 1
+      });
+      await fetchEvents();
+      setShowModal(false);
+    } catch (e) {
+      console.error("Failed to add task", e);
+      alert("Failed to create event");
+    }
   };
 
-  const handleDeleteEvent = (eventId: number) => {
-    setEvents(events.filter((e) => e.id !== eventId));
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      await tasks.deleteBlock(eventId);
+      await fetchEvents();
+    } catch (e) {
+      console.error("Failed to delete block", e);
+      alert("Failed to delete event");
+    }
   };
 
   const handleTimeSlotClick = (date: Date, hour: number) => {
